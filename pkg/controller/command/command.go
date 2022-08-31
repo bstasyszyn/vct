@@ -19,6 +19,7 @@ import (
 	"github.com/google/trillian"
 	"github.com/google/trillian/monitoring"
 	"github.com/google/trillian/types"
+	ariesjsonld "github.com/hyperledger/aries-framework-go/pkg/doc/signature/jsonld"
 	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries/api/vdr"
 	"github.com/hyperledger/aries-framework-go/pkg/kms"
@@ -214,15 +215,23 @@ func (c *Cmd) Webfinger(w io.Writer, r io.Reader) error {
 }
 
 // CreateLeaf creates MerkleTreeLeaf.
-func CreateLeaf(timestamp uint64, vc *verifiable.Credential) (*MerkleTreeLeaf, error) {
-	proofs := vc.Proofs
-	vc.Proofs = nil
+func CreateLeaf(timestamp uint64, vcBytes []byte, loader jsonld.DocumentLoader) (*MerkleTreeLeaf, error) {
+	var vcDoc map[string]interface{}
 
-	defer func() { vc.Proofs = proofs }()
-
-	credentialWithoutProofs, err := json.Marshal(vc)
+	err := json.Unmarshal(vcBytes, &vcDoc)
 	if err != nil {
-		return nil, fmt.Errorf("marshal credential: %w", err)
+		return nil, fmt.Errorf("unmarshal VC to document: %w", err)
+	}
+
+	proof := vcDoc["proof"]
+
+	defer func() { vcDoc["proof"] = proof }()
+
+	vcDoc["proof"] = nil
+
+	canonicalBytes, err := ariesjsonld.Default().GetCanonicalDocument(vcDoc, ariesjsonld.WithDocumentLoader(loader))
+	if err != nil {
+		return nil, fmt.Errorf("marshal canonical: %w", err)
 	}
 
 	return &MerkleTreeLeaf{
@@ -231,7 +240,7 @@ func CreateLeaf(timestamp uint64, vc *verifiable.Credential) (*MerkleTreeLeaf, e
 		TimestampedEntry: &TimestampedEntry{
 			EntryType: VCLogEntryType,
 			Timestamp: timestamp,
-			VCEntry:   credentialWithoutProofs,
+			VCEntry:   canonicalBytes,
 		},
 	}, nil
 }
@@ -282,7 +291,7 @@ func (c *Cmd) AddVC(w io.Writer, r io.Reader) error { // nolint: funlen
 		return fmt.Errorf("%w: issuer %s is not in a list", errors.ErrBadRequest, vc.Issuer.ID)
 	}
 
-	leaf, err := CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), vc)
+	leaf, err := CreateLeaf(uint64(time.Now().UnixNano()/int64(time.Millisecond)), req.VCEntry, loader)
 	if err != nil {
 		return fmt.Errorf("create leaf: %w", err)
 	}

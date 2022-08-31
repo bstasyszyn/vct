@@ -32,10 +32,10 @@ require (
 	github.com/stretchr/testify v1.7.5
 	github.com/trustbloc/edge-core v0.1.8
 	github.com/trustbloc/kms v0.1.9-0.20220526151939-d46e46e8f7e1
+	github.com/trustbloc/sidetree-core-go v1.0.0-rc3
 	go.etcd.io/etcd/client/v3 v3.5.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.28.0
-
 )
 
 require (

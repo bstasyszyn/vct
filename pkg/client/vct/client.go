@@ -23,8 +23,8 @@ import (
 
 	"github.com/google/trillian/merkle/rfc6962/hasher"
 	"github.com/hyperledger/aries-framework-go/pkg/crypto/tinkcrypto"
-	"github.com/hyperledger/aries-framework-go/pkg/doc/verifiable"
 	"github.com/hyperledger/aries-framework-go/pkg/kms/localkms"
+	jsonld "github.com/piprate/json-gold/ld"
 
 	"github.com/trustbloc/vct/pkg/controller/command"
 	"github.com/trustbloc/vct/pkg/controller/rest"
@@ -244,8 +244,8 @@ func (c *Client) GetEntryAndProof(ctx context.Context, leafIndex, treeSize uint6
 }
 
 // CalculateLeafHash calculates hash for given credentials.
-func CalculateLeafHash(timestamp uint64, vc *verifiable.Credential) (string, error) {
-	leaf, err := command.CreateLeaf(timestamp, vc)
+func CalculateLeafHash(timestamp uint64, vcBytes []byte, loader jsonld.DocumentLoader) (string, error) {
+	leaf, err := command.CreateLeaf(timestamp, vcBytes, loader)
 	if err != nil {
 		return "", fmt.Errorf("create leaf: %w", err)
 	}
@@ -259,14 +259,14 @@ func CalculateLeafHash(timestamp uint64, vc *verifiable.Credential) (string, err
 }
 
 // VerifyVCTimestampSignature verifies VC timestamp signature.
-func VerifyVCTimestampSignature(signature, pubKey []byte, timestamp uint64, vc *verifiable.Credential) error {
+func VerifyVCTimestampSignature(signature, pubKey []byte, timestamp uint64, vcBytes []byte, loader jsonld.DocumentLoader) error {
 	var sig *command.DigitallySigned
 
 	if err := json.Unmarshal(signature, &sig); err != nil {
 		return fmt.Errorf("unmarshal signature: %w", err)
 	}
 
-	leaf, err := command.CreateLeaf(timestamp, vc)
+	leaf, err := command.CreateLeaf(timestamp, vcBytes, loader)
 	if err != nil {
 		return fmt.Errorf("create leaf: %w", err)
 	}
